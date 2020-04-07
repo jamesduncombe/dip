@@ -14,50 +14,33 @@ drawFlag = 0;
 
 // Registers
 // CHIP-8 has 16 8-bit registers
-// 16-bit index register
-// 16-bit program counter
-typedef struct {
-  uint8_t V0;
-  uint8_t V1;
-  uint8_t V2;
-  uint8_t V3;
-  uint8_t V4;
-  uint8_t V5;
-  uint8_t V6;
-  uint8_t V7;
-  uint8_t V8;
-  uint8_t V9;
-  uint8_t VA;
-  uint8_t VB;
-  uint8_t VC;
-  uint8_t VD;
-  uint8_t VE;
-  uint8_t VF;
-  uint16_t I;
-  uint16_t PC;
-} Registers;
-
-// Initialize the registers
-Registers registers = {
-  .V0 = 0,
-  .V1 = 0,
-  .V2 = 0,
-  .V3 = 0,
-  .V4 = 0,
-  .V5 = 0,
-  .V6 = 0,
-  .V7 = 0,
-  .V8 = 0,
-  .V9 = 0,
-  .VA = 0,
-  .VB = 0,
-  .VC = 0,
-  .VD = 0,
-  .VE = 0,
-  .VF = 0,
-  .I = 0,
-  .PC = 0x200 // Program counter starts at 0x200
+enum registers {
+  V0,
+  V1,
+  V2,
+  V3,
+  V4,
+  V5,
+  V6,
+  V7,
+  V8,
+  V9,
+  VA,
+  VB,
+  VC,
+  VD,
+  VE,
+  VF,
 };
+
+// Initialize the registers to 0
+uint8_t registers[16] = {0};
+
+// 16-bit index register
+uint16_t I = 0;
+
+// 16-bit program counter
+uint16_t PC = 0x200; // Program counter starts at 0x200
 
 // Stack setup
 uint8_t stack[16] = {0};
@@ -87,40 +70,7 @@ uint8_t key[16];
 // Helpers
 
 uint8_t get_vreg(uint8_t vreg) {
-  switch(vreg) {
-    case 0x0:
-      return registers.V0;
-    case 0x1:
-      return registers.V1;
-    case 0x2:
-      return registers.V2;
-    case 0x3:
-      return registers.V3;
-    case 0x4:
-      return registers.V4;
-    case 0x5:
-      return registers.V5;
-    case 0x6:
-      return registers.V6;
-    case 0x7:
-      return registers.V7;
-    case 0x8:
-      return registers.V8;
-    case 0x9:
-      return registers.V9;
-    case 0xA:
-      return registers.VA;
-    case 0xB:
-      return registers.VB;
-    case 0xC:
-      return registers.VC;
-    case 0xD:
-      return registers.VD;
-    case 0xE:
-      return registers.VE;
-    case 0xF:
-      return registers.VF;
-  }
+  return registers[vreg];
 }
 
 // Fontset from: http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
@@ -157,82 +107,34 @@ void call_nnn(uint16_t nnn) {
   SP += 1;
 
   // these might need a swap over!
-  stack[SP] = registers.PC;
+  stack[SP] = PC;
 
   // Set PC to nnn
-  registers.PC = nnn;
+  PC = nnn;
 }
 
 // 6xkk - LD Vx, byte
 // LD Vx, byte
 void ld_vx_yy(uint8_t vx, uint8_t yy) {
   printf("LD V%X, 0x%X\n", vx, opcode & 0x00ff);
-  switch(vx) {
-    case 0x0:
-      registers.V0 = opcode & 0x00ff;
-      break;
-    case 0x1:
-      registers.V1 = opcode & 0x00ff;
-      break;
-    case 0x2:
-      registers.V2 = opcode & 0x00ff;
-      break;
-    case 0x3:
-      registers.V3 = opcode & 0x00ff;
-      break;
-    case 0x4:
-      registers.V4 = opcode & 0x00ff;
-      break;
-    case 0x5:
-      registers.V5 = opcode & 0x00ff;
-      break;
-    case 0x6:
-      registers.V6 = opcode & 0x00ff;
-      break;
-    case 0x7:
-      registers.V7 = opcode & 0x00ff;
-      break;
-    case 0x8:
-      registers.V8 = opcode & 0x00ff;
-      break;
-    case 0x9:
-      registers.V9 = opcode & 0x00ff;
-      break;
-    case 0xA:
-      registers.VA = opcode & 0x00ff;
-      break;
-    case 0xB:
-      registers.VB = opcode & 0x00ff;
-      break;
-    case 0xC:
-      registers.VC = opcode & 0x00ff;
-      break;
-    case 0xD:
-      registers.VD = opcode & 0x00ff;
-      break;
-    case 0xE:
-      registers.VE = opcode & 0x00ff;
-      break;
-    case 0xF:
-      registers.VF = opcode & 0x00ff;
-      break;
-  }
+  registers[vx] = opcode & 0x00ff;
+
   // Increment the PC by 2
-  registers.PC += 2;
+  PC += 2;
 }
 
 // LD I, addr
 void ld_i_nnn(uint8_t nnn) {
   printf("LD I, 0x%X\n", nnn);
-  registers.I = nnn;
-  registers.PC += 2;
+  I = nnn;
+  PC += 2;
 }
 
 // JP V0, addr
 // Jump to location nnn + V0.
 void jp_v0_nnn(uint16_t nnn) {
   // The program counter is set to nnn plus the value of V0.
-  registers.PC = registers.V0 + nnn;
+  PC = registers[V0] + nnn;
 }
 
 // Cxkk - RND Vx, byte
@@ -261,18 +163,18 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
   uint8_t pixel;
 
   // Zero out the carry/collision flag
-  registers.VF = 0;
+  registers[VF] = 0;
 
   // Lines
   for (int yline = 0; yline < n; yline++) {
-    pixel = memory[registers.I + yline];
+    pixel = memory[I + yline];
     // Each sprite is only 8 bits line
     for (int xline = 0; xline < 8; xline++) {
       // Run through each pixel at a time to check it's on/off
       if ((pixel & 0b10000000) != 0) {
         // If the current pixel is set... we need to turn on the collision flag
         if (gfx[x + xline + ((y + yline) * 64)] == 1) {
-          registers.VF = 1;
+          registers[VF] = 1;
         }
         // Update the graphics buffer
         gfx[x + xline + ((y + yline) * 64)] ^= 1;
@@ -282,7 +184,7 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
 
   // toggle the draw flag in the loop
   drawFlag = 1;
-  registers.PC += 2;
+  PC += 2;
 }
 
 // Fx33 - LD B, Vx
@@ -297,11 +199,11 @@ void ld_b_vx(uint8_t x) {
   uint8_t current_val = get_vreg(x);
 
   // Store the representation in memory
-  memory[registers.I] = current_val / 100;
-  memory[registers.I + 1] = current_val / 10 % 10;
-  memory[registers.I + 2] = current_val % 10;
+  memory[I] = current_val / 100;
+  memory[I + 1] = current_val / 10 % 10;
+  memory[I + 2] = current_val % 10;
 
-  registers.PC += 2;
+  PC += 2;
 }
 
 // Fx65 - LD Vx, [I]
@@ -310,10 +212,10 @@ void ld_b_vx(uint8_t x) {
 void ld_vx_i(uint8_t x) {
 
   for (int i = 0; i < (int)x; i++) {
-    printf("%d, %x\n", x, memory[registers.I + i]);
+    printf("%d, %x\n", x, memory[I + i]);
   }
 
-  registers.PC += 2;
+  PC += 2;
 }
 
 // Initializes all values where needed for the architecture.
@@ -352,7 +254,7 @@ void initialize() {
 void emulate_cycle() {
 
   // Fetch opcode
-  opcode = memory[registers.PC] << 8 | memory[registers.PC + 1];
+  opcode = memory[PC] << 8 | memory[PC + 1];
 
   // Decode opcode
   switch(opcode & 0xF000) {
