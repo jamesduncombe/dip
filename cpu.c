@@ -414,9 +414,10 @@ void ld_b_vx(uint8_t x) {
 // The interpreter reads values from memory starting at location I
 // into registers V0 through Vx.
 void ld_vx_i(uint8_t x) {
+  printf("LD V%X, [I]\n", x);
 
-  for (int i = 0; i < (int)x; i++) {
-    printf("%d, %x\n", x, memory[I + i]);
+  for (int i = 0; i <= x; i++) {
+    registers[i] = memory[I + i];
   }
 
   PC += 2;
