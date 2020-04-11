@@ -178,8 +178,8 @@ void sne_vx_yy(uint8_t x, uint8_t yy) {
 // 6xkk - LD Vx, byte
 // LD Vx, byte
 void ld_vx_yy(uint8_t vx, uint8_t yy) {
-  printf("LD V%X, 0x%X\n", vx, opcode & 0x00ff);
-  registers[vx] = opcode & 0x00ff;
+  printf("LD V%X, 0x%X\n", vx, yy);
+  registers[vx] = yy;
 
   // Increment the PC by 2
   PC += 2;
@@ -267,26 +267,31 @@ void ld_i_nnn(uint16_t nnn) {
   PC += 2;
 }
 
-// JP V0, addr
+// Bnnn - JP V0, addr
 // Jump to location nnn + V0.
 void jp_v0_nnn(uint16_t nnn) {
+  printf("JP V0, 0x%X\n", nnn);
   // The program counter is set to nnn plus the value of V0.
   PC = registers[V0] + nnn;
 }
 
 // Cxkk - RND Vx, byte
 // Set Vx = random byte AND kk.
-// The interpreter generates a random number from 0 to 255, 
+// The interpreter generates a random number from 0 to 255,
 // which is then ANDed with the value kk. The results are stored in Vx.
-void rnd_vx_yy(uint8_t vx, uint8_t yy) {
+void rnd_vx_yy(uint8_t x, uint8_t yy) {
+  printf("RND V%X, %X\n", x, yy);
 
+  registers[x] = (rand() % 255) & yy;
+
+  PC += 2;
 }
 
 // Dxyn - DRW Vx, Vy, nibble
 // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
 // The interpreter reads n bytes from memory, starting at the address stored in I.
 // These bytes are then displayed as sprites on screen at coordinates (Vx, Vy).
-// Sprites are XORed onto the existing screen. If this causes any pixels to be 
+// Sprites are XORed onto the existing screen. If this causes any pixels to be
 // erased, VF is set to 1, otherwise it is set to 0. If the sprite is positioned
 // so part of it is outside the coordinates of the display, it wraps around to
 // the opposite side of the screen. See instruction 8xy3 for more information
