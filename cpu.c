@@ -43,7 +43,7 @@ uint16_t I = 0;
 uint16_t PC = 0x200; // Program counter starts at 0x200
 
 // Stack setup
-uint8_t stack[16] = {0};
+uint16_t stack[16] = {0};
 // Stack pointer
 uint8_t SP = 0;
 
