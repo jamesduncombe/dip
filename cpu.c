@@ -8,30 +8,12 @@ Includes all instructions
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+
+#include "cpu.h"
 
 // Flag for whether to update the graphics output or not
-drawFlag = 0;
-
-// Registers
-// CHIP-8 has 16 8-bit registers
-enum registers {
-  V0,
-  V1,
-  V2,
-  V3,
-  V4,
-  V5,
-  V6,
-  V7,
-  V8,
-  V9,
-  VA,
-  VB,
-  VC,
-  VD,
-  VE,
-  VF,
-};
+int drawFlag = 0;
 
 // Initialize the registers to 0
 uint8_t registers[16] = {0};
