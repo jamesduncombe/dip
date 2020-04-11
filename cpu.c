@@ -9,6 +9,7 @@ Includes all instructions
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "cpu.h"
 
@@ -51,8 +52,18 @@ uint8_t key[16];
 
 // Helpers
 
+// Get a registers value
 uint8_t get_vreg(uint8_t vreg) {
   return registers[vreg];
+}
+
+// Log out a message
+// TODO: Expand with other log options
+void logger(const char *pattern, ...) {
+  va_list args;
+  va_start(args, pattern);
+  vprintf(pattern, args);
+  va_end(args);
 }
 
 // Fontset from: http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
@@ -83,14 +94,14 @@ uint8_t chip8_fontset[80] = {
 // This instruction is only used on the old computers on which Chip-8 was
 // originally implemented. It is ignored by modern interpreters.
 void sys(uint16_t nnn) {
-  printf("SYS %X\n", nnn);
+  logger("SYS %X\n", nnn);
   PC = nnn;
 }
 
 // 00E0 - CLS
 // Clear the display.
 void cls() {
-  printf("CLS\n");
+  logger("CLS\n");
   memset(gfx, 0, 64 * 32);
   PC += 2;
 }
@@ -100,7 +111,7 @@ void cls() {
 // The interpreter sets the program counter to the address at the top of the
 // stack, then subtracts 1 from the stack pointer.
 void ret() {
-  printf("RET\n");
+  logger("RET\n");
   PC = stack[SP];
   SP--;
 }
@@ -109,7 +120,7 @@ void ret() {
 // Jump to location nnn.
 // The interpreter sets the program counter to nnn.
 void jp(uint16_t addr) {
-  printf("JP 0x%X\n", addr);
+  logger("JP 0x%X\n", addr);
   PC = addr;
 }
 
@@ -118,7 +129,7 @@ void jp(uint16_t addr) {
 // The interpreter increments the stack pointer, then puts the current PC on
 // the top of the stack. The PC is then set to nnn.
 void call_nnn(uint16_t nnn) {
-  printf("CALL 0x%X\n", nnn);
+  logger("CALL 0x%X\n", nnn);
 
   // Increment the stack pointer
   SP += 1;
@@ -134,7 +145,7 @@ void call_nnn(uint16_t nnn) {
 // The interpreter compares register Vx to kk, and if they are equal,
 // increments the program counter by 2.
 void se_vx_yy(uint8_t x, uint8_t yy) {
-  printf("SE V%X, 0x%X\n", x, yy);
+  logger("SE V%X, 0x%X\n", x, yy);
 
   if (registers[x] == yy) {
     PC += 4;
@@ -148,7 +159,7 @@ void se_vx_yy(uint8_t x, uint8_t yy) {
 // The interpreter compares register Vx to kk, and if they are not equal,
 // increments the program counter by 2.
 void sne_vx_yy(uint8_t x, uint8_t yy) {
-  printf("SNE V%X, %X\n", x, yy);
+  logger("SNE V%X, %X\n", x, yy);
 
   if (registers[x] != yy) {
     PC += 4;
@@ -160,7 +171,7 @@ void sne_vx_yy(uint8_t x, uint8_t yy) {
 // 6xkk - LD Vx, byte
 // LD Vx, byte
 void ld_vx_yy(uint8_t vx, uint8_t yy) {
-  printf("LD V%X, 0x%X\n", vx, yy);
+  logger("LD V%X, 0x%X\n", vx, yy);
   registers[vx] = yy;
 
   // Increment the PC by 2
@@ -171,7 +182,7 @@ void ld_vx_yy(uint8_t vx, uint8_t yy) {
 // Set Vx = Vx + kk.
 // Adds the value kk to the value of register Vx, then stores the result in Vx.
 void add_vx_yy(uint8_t x, uint8_t yy) {
-  printf("ADD V%X, 0x%x\n", x, yy);
+  logger("ADD V%X, 0x%x\n", x, yy);
   registers[x] = registers[x] + yy;
 
   PC += 2;
@@ -181,7 +192,7 @@ void add_vx_yy(uint8_t x, uint8_t yy) {
 // Set Vx = Vy.
 // Stores the value of register Vy in register Vx.
 void ld_vx_vy(uint8_t x, uint8_t y) {
-  printf("LD V%X, V%X\n", x, y);
+  logger("LD V%X, V%X\n", x, y);
 
   registers[x] = registers[y];
 
@@ -194,7 +205,7 @@ void ld_vx_vy(uint8_t x, uint8_t y) {
 // A bitwise AND compares the corrseponding bits from two values, and if both bits
 // are 1, then the same bit in the result is also 1. Otherwise, it is 0.
 void and_vx_vy(uint8_t x, uint8_t y) {
-  printf("AND V%X, V%X\n", x, y);
+  logger("AND V%X, V%X\n", x, y);
 
   registers[x] = registers[x] & registers[y];
 
@@ -207,7 +218,7 @@ void and_vx_vy(uint8_t x, uint8_t y) {
 // bits (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the
 // result are kept, and stored in Vx.
 void add_vx_vy(uint8_t x, uint8_t y) {
-  printf("ADD V%X, V%X\n", x, y);
+  logger("ADD V%X, V%X\n", x, y);
 
   if (registers[x] > (255 - registers[y])) {
     registers[VF] = 1;
@@ -226,7 +237,7 @@ void add_vx_vy(uint8_t x, uint8_t y) {
 // If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx,
 // and the results stored in Vx.
 void sub_vx_vy(uint8_t x, uint8_t y) {
-  printf("SUB V%X, V%X\n", x, y);
+  logger("SUB V%X, V%X\n", x, y);
 
   if (registers[x] > registers[y]) {
     registers[VF] = 1;
@@ -244,7 +255,7 @@ void sub_vx_vy(uint8_t x, uint8_t y) {
 // Set I = nnn.
 // The value of register I is set to nnn.
 void ld_i_nnn(uint16_t nnn) {
-  printf("LD I, 0x%X\n", nnn);
+  logger("LD I, 0x%X\n", nnn);
   I = nnn;
   PC += 2;
 }
@@ -252,7 +263,7 @@ void ld_i_nnn(uint16_t nnn) {
 // Bnnn - JP V0, addr
 // Jump to location nnn + V0.
 void jp_v0_nnn(uint16_t nnn) {
-  printf("JP V0, 0x%X\n", nnn);
+  logger("JP V0, 0x%X\n", nnn);
   // The program counter is set to nnn plus the value of V0.
   PC = registers[V0] + nnn;
 }
@@ -262,7 +273,7 @@ void jp_v0_nnn(uint16_t nnn) {
 // The interpreter generates a random number from 0 to 255,
 // which is then ANDed with the value kk. The results are stored in Vx.
 void rnd_vx_yy(uint8_t x, uint8_t yy) {
-  printf("RND V%X, %X\n", x, yy);
+  logger("RND V%X, %X\n", x, yy);
 
   registers[x] = (rand() % 255) & yy;
 
@@ -280,7 +291,7 @@ void rnd_vx_yy(uint8_t x, uint8_t yy) {
 // on XOR, and section 2.4, Display, for more information on the Chip-8 screen
 // and sprites.
 void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
-  printf("DRW V%X, V%X, %X\n", x, y, n);
+  logger("DRW V%X, V%X, %X\n", x, y, n);
 
   uint8_t x_val = get_vreg(x);
   uint8_t y_val = get_vreg(y);
@@ -316,7 +327,7 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
 // Checks the keyboard, and if the key corresponding to the value of
 // Vx is currently in the up position, PC is increased by 2.
 void sknp_vx(uint8_t x) {
-  printf("SKNP V%X\n", x);
+  logger("SKNP V%X\n", x);
 
   if ((key[x] & 1) != 1) {
     PC += 4;
@@ -329,7 +340,7 @@ void sknp_vx(uint8_t x) {
 // Set Vx = delay timer value.
 // The value of DT is placed into Vx.
 void ld_vx_dt(uint8_t x) {
-  printf("LD V%X, DT\n", x);
+  logger("LD V%X, DT\n", x);
   registers[x] = delay_timer;
   PC += 2;
 }
@@ -338,7 +349,7 @@ void ld_vx_dt(uint8_t x) {
 // Set delay timer = Vx.
 // DT is set equal to the value of Vx.
 void ld_dt_vx(uint8_t x) {
-  printf("LD DT, V%X\n", x);
+  logger("LD DT, V%X\n", x);
   delay_timer = registers[x];
   PC += 2;
 }
@@ -347,7 +358,7 @@ void ld_dt_vx(uint8_t x) {
 // Set sound timer = Vx.
 // ST is set equal to the value of Vx.
 void ld_st_vx(uint8_t x) {
-  printf("LD ST, V%X\n", x);
+  logger("LD ST, V%X\n", x);
   sound_timer = registers[x];
   PC += 2;
 }
@@ -356,7 +367,7 @@ void ld_st_vx(uint8_t x) {
 // Set I = I + Vx.
 // The values of I and Vx are added, and the results are stored in I.
 void add_i_vx(uint8_t x) {
-  printf("ADD I, V%X\n", x);
+  logger("ADD I, V%X\n", x);
   I += registers[x];
   PC += 2;
 }
@@ -367,8 +378,8 @@ void add_i_vx(uint8_t x) {
 // to the value of Vx. See section 2.4, Display, for more information on the
 // Chip-8 hexadecimal font.
 void ld_f_vx(uint8_t x) {
-  printf("LD F, V%X\n", x);
-  // printf("Loading sprite %d\n", registers[x] * 5);
+  logger("LD F, V%X\n", x);
+  // logger("Loading sprite %d\n", registers[x] * 5);
   I = registers[x] * 5;
   PC += 2;
 }
@@ -379,7 +390,7 @@ void ld_f_vx(uint8_t x) {
 // digit in memory at location in I, the tens digit at location I+1, and the
 // ones digit at location I+2.
 void ld_b_vx(uint8_t x) {
-  printf("LD B, V%X\n", x);
+  logger("LD B, V%X\n", x);
 
   // Store BCD representation of Vx in memory locations I, I+1, and I+2.
   uint8_t current_val = get_vreg(x);
@@ -396,7 +407,7 @@ void ld_b_vx(uint8_t x) {
 // The interpreter reads values from memory starting at location I
 // into registers V0 through Vx.
 void ld_vx_i(uint8_t x) {
-  printf("LD V%X, [I]\n", x);
+  logger("LD V%X, [I]\n", x);
 
   for (int i = 0; i <= x; i++) {
     registers[i] = memory[I + i];
@@ -443,6 +454,8 @@ void emulate_cycle() {
   // Fetch opcode
   opcode = memory[PC] << 8 | memory[PC + 1];
 
+  logger("0x%X - OC: 0x%X - ", PC, opcode);
+
   // Decode opcode
   switch(opcode & 0xF000) {
 
@@ -461,7 +474,7 @@ void emulate_cycle() {
           break;
 
         default:
-          printf("Unknown opcode: in 0x0: 0x%X\n", opcode);
+          logger("Unknown opcode: in 0x0: 0x%X\n", opcode);
           break;
       }
       break;
@@ -509,7 +522,7 @@ void emulate_cycle() {
           break;
 
         default:
-          printf("Unknown opcode: in 0x8: 0x%X\n", opcode);
+          logger("Unknown opcode: in 0x8: 0x%X\n", opcode);
           break;
 
       }
@@ -566,13 +579,13 @@ void emulate_cycle() {
           break;
 
         default:
-          printf("Unknown opcode: 0x%X\n", opcode);
+          logger("Unknown opcode: 0x%X\n", opcode);
           break;
       }
       break;
 
     default:
-      printf("Unknown opcode: 0x%X\n", opcode);
+      logger("Unknown opcode: 0x%X\n", opcode);
       break;
   }
 
@@ -583,7 +596,7 @@ void emulate_cycle() {
 
   if (sound_timer > 0) {
     if (sound_timer == 1) {
-      printf("BEEP!\n");
+      logger("****** BEEP! ******\n");
     }
     --sound_timer;
   }
