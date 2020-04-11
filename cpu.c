@@ -417,7 +417,7 @@ void ld_vx_i(uint8_t x) {
 }
 
 // Initializes all values where needed for the architecture.
-void initialize() {
+void initialize(uint8_t *game, size_t game_size) {
 
   // Load fontset
   for (int i = 0; i < 80; i++) {
@@ -428,21 +428,16 @@ void initialize() {
   delay_timer = 0;
   sound_timer = 0;
 
-  printf("Loading ROM...\n");
+  logger("Loading ROM...\n");
 
   // Load the ROM file
   int bufferSize = 2048;
   uint8_t buffer[bufferSize];
-  FILE *fp = fopen("pong.rom", "rb");
-
-  size_t read_bytes = fread(buffer, 1, bufferSize, fp);
-  printf("Read %zu\n", read_bytes);
-
-  // Close the ROM file
-  fclose(fp);
+  memcpy(buffer, game, game_size);
+  logger("Read %zu\n", game_size);
 
   // Load ROM into memory
-  printf("Loading ROM into memory...\n");
+  logger("Loading ROM into memory...\n");
   for (int i = 0; i < bufferSize; i++) {
     memory[512 + i] = buffer[i];
   }
