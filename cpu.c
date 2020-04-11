@@ -302,7 +302,7 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
 
   uint8_t x_val = get_vreg(x);
   uint8_t y_val = get_vreg(y);
-  uint8_t pixel;
+  uint8_t pixel = 0;
 
   // Zero out the carry/collision flag
   registers[VF] = 0;
@@ -310,16 +310,16 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
   // Lines
   for (int yline = 0; yline < n; yline++) {
     pixel = memory[I + yline];
-    // Each sprite is only 8 bits line
+    // Each sprite is only 8 bits long
     for (int xline = 0; xline < 8; xline++) {
       // Run through each pixel at a time to check it's on/off
-      if ((pixel & 0b10000000) != 0) {
+      if ((pixel & (0b10000000 >> xline)) != 0) {
         // If the current pixel is set... we need to turn on the collision flag
-        if (gfx[x + xline + ((y + yline) * 64)] == 1) {
+        if (gfx[x_val + xline + ((y_val + yline) * 64) % (64 * 32)] == 1) {
           registers[VF] = 1;
         }
         // Update the graphics buffer
-        gfx[x + xline + ((y + yline) * 64)] ^= 1;
+        gfx[x_val + xline + ((y_val + yline) * 64) % (64 * 32)] ^= 1;
       }
     }
   }
