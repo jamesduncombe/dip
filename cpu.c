@@ -96,6 +96,41 @@ uint8_t chip8_fontset[80] = {
 
 // Instructions - opcode order
 
+// 0nnn - SYS addr
+// Jump to a machine code routine at nnn.
+// This instruction is only used on the old computers on which Chip-8 was
+// originally implemented. It is ignored by modern interpreters.
+void sys(uint16_t nnn) {
+  printf("SYS %X\n", nnn);
+  PC = nnn;
+}
+
+// 00E0 - CLS
+// Clear the display.
+void cls() {
+  printf("CLS\n");
+  memset(gfx, 0, 64 * 32);
+  PC += 2;
+}
+
+// 00EE - RET
+// Return from a subroutine.
+// The interpreter sets the program counter to the address at the top of the
+// stack, then subtracts 1 from the stack pointer.
+void ret() {
+  printf("RET\n");
+  PC = stack[SP];
+  SP--;
+}
+
+// 1nnn - JP addr
+// Jump to location nnn.
+// The interpreter sets the program counter to nnn.
+void jp(uint16_t addr) {
+  printf("JP 0x%X\n", addr);
+  PC = addr;
+}
+
 // 2nnn - CALL addr
 // Call subroutine at nnn.
 // The interpreter increments the stack pointer, then puts the current PC on
@@ -106,11 +141,38 @@ void call_nnn(uint16_t nnn) {
   // Increment the stack pointer
   SP += 1;
 
-  // these might need a swap over!
-  stack[SP] = PC;
+  stack[SP] = PC + 2;
 
   // Set PC to nnn
   PC = nnn;
+}
+
+// 3xkk - SE Vx, byte
+// Skip next instruction if Vx = kk.
+// The interpreter compares register Vx to kk, and if they are equal,
+// increments the program counter by 2.
+void se_vx_yy(uint8_t x, uint8_t yy) {
+  printf("SE V%X, 0x%X\n", x, yy);
+
+  if (registers[x] == yy) {
+    PC += 4;
+  } else {
+    PC += 2;
+  }
+}
+
+// 4xkk - SNE Vx, byte
+// Skip next instruction if Vx != kk.
+// The interpreter compares register Vx to kk, and if they are not equal,
+// increments the program counter by 2.
+void sne_vx_yy(uint8_t x, uint8_t yy) {
+  printf("SNE V%X, %X\n", x, yy);
+
+  if (registers[x] != yy) {
+    PC += 4;
+  } else {
+    PC += 2;
+  }
 }
 
 // 6xkk - LD Vx, byte
@@ -123,8 +185,83 @@ void ld_vx_yy(uint8_t vx, uint8_t yy) {
   PC += 2;
 }
 
-// LD I, addr
-void ld_i_nnn(uint8_t nnn) {
+// 7xkk - ADD Vx, byte
+// Set Vx = Vx + kk.
+// Adds the value kk to the value of register Vx, then stores the result in Vx.
+void add_vx_yy(uint8_t x, uint8_t yy) {
+  printf("ADD V%X, 0x%x\n", x, yy);
+  registers[x] = registers[x] + yy;
+
+  PC += 2;
+}
+
+// 8xy0 - LD Vx, Vy
+// Set Vx = Vy.
+// Stores the value of register Vy in register Vx.
+void ld_vx_vy(uint8_t x, uint8_t y) {
+  printf("LD V%X, V%X\n", x, y);
+
+  registers[x] = registers[y];
+
+  PC += 2;
+}
+
+// 8xy2 - AND Vx, Vy
+// Set Vx = Vx AND Vy.
+// Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
+// A bitwise AND compares the corrseponding bits from two values, and if both bits
+// are 1, then the same bit in the result is also 1. Otherwise, it is 0.
+void and_vx_vy(uint8_t x, uint8_t y) {
+  printf("AND V%X, V%X\n", x, y);
+
+  registers[x] = registers[x] & registers[y];
+
+  PC += 2;
+}
+
+// 8xy4 - ADD Vx, Vy
+// Set Vx = Vx + Vy, set VF = carry.
+// The values of Vx and Vy are added together. If the result is greater than 8
+// bits (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the
+// result are kept, and stored in Vx.
+void add_vx_vy(uint8_t x, uint8_t y) {
+  printf("ADD V%X, V%X\n", x, y);
+
+  if (registers[x] > (255 - registers[y])) {
+    registers[VF] = 1;
+  } else {
+    registers[VF] = 0;
+  }
+
+  // Store result in Vx
+  registers[x] = registers[x] + registers[y];
+
+  PC += 2;
+}
+
+// 8xy5 - SUB Vx, Vy
+// Set Vx = Vx - Vy, set VF = NOT borrow.
+// If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx,
+// and the results stored in Vx.
+void sub_vx_vy(uint8_t x, uint8_t y) {
+  printf("SUB V%X, V%X\n", x, y);
+
+  if (registers[x] > registers[y]) {
+    registers[VF] = 1;
+  } else {
+    registers[VF] = 0;
+  }
+
+  registers[x] = registers[x] - registers[y];
+
+  PC += 2;
+
+}
+
+// Annn - LD I, addr
+// Set I = nnn.
+// The value of register I is set to nnn.
+void ld_i_nnn(uint16_t nnn) {
   printf("LD I, 0x%X\n", nnn);
   I = nnn;
   PC += 2;
@@ -184,6 +321,68 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
 
   // toggle the draw flag in the loop
   drawFlag = 1;
+  PC += 2;
+}
+
+// ExA1 - SKNP Vx
+// Skip next instruction if key with the value of Vx is not pressed.
+// Checks the keyboard, and if the key corresponding to the value of
+// Vx is currently in the up position, PC is increased by 2.
+void sknp_vx(uint8_t x) {
+  printf("SKNP V%X\n", x);
+
+  if ((key[x] & 1) != 1) {
+    PC += 4;
+  } else {
+    PC += 2;
+  }
+}
+
+// Fx07 - LD Vx, DT
+// Set Vx = delay timer value.
+// The value of DT is placed into Vx.
+void ld_vx_dt(uint8_t x) {
+  printf("LD V%X, DT\n", x);
+  registers[x] = delay_timer;
+  PC += 2;
+}
+
+// Fx15 - LD DT, Vx
+// Set delay timer = Vx.
+// DT is set equal to the value of Vx.
+void ld_dt_vx(uint8_t x) {
+  printf("LD DT, V%X\n", x);
+  delay_timer = registers[x];
+  PC += 2;
+}
+
+// Fx18 - LD ST, Vx
+// Set sound timer = Vx.
+// ST is set equal to the value of Vx.
+void ld_st_vx(uint8_t x) {
+  printf("LD ST, V%X\n", x);
+  sound_timer = registers[x];
+  PC += 2;
+}
+
+// Fx1E - ADD I, Vx
+// Set I = I + Vx.
+// The values of I and Vx are added, and the results are stored in I.
+void add_i_vx(uint8_t x) {
+  printf("ADD I, V%X\n", x);
+  I += registers[x];
+  PC += 2;
+}
+
+// Fx29 - LD F, Vx
+// Set I = location of sprite for digit Vx.
+// The value of I is set to the location for the hexadecimal sprite corresponding
+// to the value of Vx. See section 2.4, Display, for more information on the
+// Chip-8 hexadecimal font.
+void ld_f_vx(uint8_t x) {
+  printf("LD F, V%X\n", x);
+  // printf("Loading sprite %d\n", registers[x] * 5);
+  I = registers[x] * 5;
   PC += 2;
 }
 
@@ -259,12 +458,73 @@ void emulate_cycle() {
   // Decode opcode
   switch(opcode & 0xF000) {
 
+    case 0x00:
+      switch(opcode & 0x00ff) {
+        case 0x00: // SYS addr
+          sys(opcode & 0x0fff);
+          break;
+
+        case 0xE0: // CLS
+          cls();
+          break;
+
+        case 0xEE: // RET
+          ret();
+          break;
+
+        default:
+          printf("Unknown opcode: in 0x0: 0x%X\n", opcode);
+          break;
+      }
+      break;
+
+    case 0x1000: // JP addr
+      jp(opcode & 0x0fff);
+      break;
+
     case 0x2000: // CALL addr
       call_nnn(opcode & 0x0fff);
       break;
 
+    case 0x3000: // SE Vx, byte
+      se_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+      break;
+
+    case 0x4000: // SNE Vx, byte
+      sne_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+      break;
+
     case 0x6000: // LD Vx, byte
       ld_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+      break;
+
+    case 0x7000: // ADD Vx, byte
+      add_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+      break;
+
+    case 0x8000:
+      switch(opcode & 0xf) {
+        case 0x0: // LD Vx, Vy
+          ld_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        case 0x2: // AND Vx, Vy
+          and_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        case 0x4: // ADD Vx, Vy
+          add_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        case 0x5: // SUB Vx, Vy
+          sub_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        default:
+          printf("Unknown opcode: in 0x8: 0x%X\n", opcode);
+          break;
+
+      }
       break;
 
     case 0xA000: // LD I, addr
@@ -274,17 +534,41 @@ void emulate_cycle() {
     // case 0xB000: // JP V0, addr
     //   break;
 
-    // case 0xC000: // RND Vx, byte
-    //   break;
+    case 0xC000: // RND Vx, byte
+      rnd_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
+      break;
 
     case 0xD000: // DRW Vx, Vy, nibble
       // Example: 0xDAB6
       drw_vx_vy((opcode & 0xf00) >> 8, (opcode & 0x00f0) >> 4, opcode & 0x000f);
       break;
 
+    case 0xE000: // SKNP Vx
+      sknp_vx((opcode & 0xf00) >> 8);
+      break;
+
     case 0xF000:
-      printf("opcode: 0x%X\n", opcode);
       switch(opcode & 0x00ff) {
+        case 0x07:
+          ld_vx_dt((opcode & 0x0f00) >> 8);
+          break;
+
+        case 0x15:
+          ld_dt_vx((opcode & 0x0f00) >> 8);
+          break;
+
+        case 0x18: // LD ST, Vx
+          ld_st_vx((opcode & 0x0f00) >> 8);
+          break;
+
+        case 0x1E: // ADD I, Vx
+          add_i_vx((opcode & 0x0f00) >> 8);
+          break;
+
+        case 0x29:
+          ld_f_vx((opcode & 0x0f00) >> 8);
+          break;
+
         case 0x33:
           ld_b_vx((opcode & 0x0f00) >> 8);
           break;
@@ -294,12 +578,14 @@ void emulate_cycle() {
           break;
 
         default:
+          printf("Unknown opcode: 0x%X\n", opcode);
           break;
       }
       break;
 
     default:
       printf("Unknown opcode: 0x%X\n", opcode);
+      break;
   }
 
   // Update timers
