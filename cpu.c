@@ -14,28 +14,28 @@ Includes all instructions
 #include "cpu.h"
 
 // Flag for whether to update the graphics output or not
-int drawFlag = 0;
+int drawFlag;
 
 // Initialize the registers to 0
-uint8_t registers[16] = {0};
+uint8_t registers[16];
 
 // 16-bit index register
-uint16_t I = 0;
+uint16_t I;
 
 // 16-bit program counter
 uint16_t PC = 0x200; // Program counter starts at 0x200
 
 // Stack setup
-uint16_t stack[16] = {0};
+uint16_t stack[16];
 // Stack pointer
-uint8_t SP = 0;
+uint8_t SP;
 
 // Memory
 // CHIP-8 has 4k of main memory
-uint8_t memory[4096] = {0};
+uint8_t memory[4096];
 
 // Current opcode
-uint16_t opcode = 0;
+uint16_t opcode;
 
 // Graphics
 // Screen has a total of 2048 (64 * 32) pixels
