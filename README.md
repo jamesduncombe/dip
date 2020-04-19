@@ -27,5 +27,5 @@ Once you have those installed you should be able to build Dip with `make`.
 Then spin it up with:
 
 ```
-./dip
+./dip -r [path to rom file]
 ```
