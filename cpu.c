@@ -443,6 +443,20 @@ void initialize(uint8_t *game, size_t game_size) {
   }
 }
 
+void update_timers() {
+  // Update timers
+  if (delay_timer > 0) {
+    --delay_timer;
+  }
+
+  if (sound_timer > 0) {
+    if (sound_timer == 1) {
+      printf("****** BEEP! ******\n");
+    }
+    --sound_timer;
+  }
+}
+
 // Emulates the actual CPU clock cycle.
 void emulate_cycle() {
 
@@ -582,18 +596,6 @@ void emulate_cycle() {
     default:
       logger("Unknown opcode: 0x%X\n", opcode);
       break;
-  }
-
-  // Update timers
-  if (delay_timer > 0) {
-    --delay_timer;
-  }
-
-  if (sound_timer > 0) {
-    if (sound_timer == 1) {
-      logger("****** BEEP! ******\n");
-    }
-    --sound_timer;
   }
 
 }

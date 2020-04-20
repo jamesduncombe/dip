@@ -6,10 +6,15 @@
 
 void initialize();
 void emulate_cycle();
+void update_timers();
 
-uint8_t gfx[64 * 32];
+extern uint8_t gfx[64 * 32];
 
-int drawFlag;
+extern int drawFlag;
+
+extern uint8_t sound_timer;
+
+extern uint8_t key[16];
 
 // Registers
 // CHIP-8 has 16 8-bit registers
