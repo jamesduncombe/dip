@@ -212,6 +212,18 @@ void and_vx_vy(uint8_t x, uint8_t y) {
   PC += 2;
 }
 
+// 8xy3 - XOR Vx, Vy
+// Set Vx = Vx XOR Vy.
+// Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the
+// result in Vx. An exclusive OR compares the corrseponding bits from two values,
+// and if the bits are not both the same, then the corresponding bit in the
+// result is set to 1. Otherwise, it is 0.
+void xor_vx_vy(uint8_t x, uint8_t y) {
+  logger("XOR V%X, V%X\n", x, y);
+  registers[x] ^= registers[y];
+  PC += 2;
+}
+
 // 8xy4 - ADD Vx, Vy
 // Set Vx = Vx + Vy, set VF = carry.
 // The values of Vx and Vy are added together. If the result is greater than 8
@@ -248,7 +260,38 @@ void sub_vx_vy(uint8_t x, uint8_t y) {
   registers[x] = registers[x] - registers[y];
 
   PC += 2;
+}
 
+// 8xy6 - SHR Vx {, Vy}
+// Set Vx = Vx SHR 1.
+// If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
+// Then Vx is divided by 2.
+void shr_vx_vy(uint8_t x, uint8_t y) {
+  logger("SHR V%X {, V%X}\n", x, y);
+
+  if ((registers[x] & 0x1) == 1) {
+    registers[VF] = 1;
+  } else {
+    registers[VF] = 0;
+  }
+
+  registers[x] /= 2;
+
+  PC += 2;
+}
+
+// 9xy0 - SNE Vx, Vy
+// Skip next instruction if Vx != Vy.
+// The values of Vx and Vy are compared, and if they are not equal, the program
+// counter is increased by 2.
+void sne_vx_vy(uint8_t x, uint8_t y) {
+  logger("SNE V%X, V%X\n", x, y);
+
+  if (registers[x] != registers[y]) {
+    PC += 2;
+  }
+
+  PC += 2;
 }
 
 // Annn - LD I, addr
@@ -322,6 +365,20 @@ void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
   PC += 2;
 }
 
+// Ex9E - SKP Vx
+// Skip next instruction if key with the value of Vx is pressed.
+// Checks the keyboard, and if the key corresponding to the value of
+// Vx is currently in the down position, PC is increased by 2.
+void skp_vx(uint8_t x) {
+  logger("SKP V%X\n", x);
+
+  if (key[registers[x]] == 1) {
+    PC += 4;
+  } else {
+    PC += 2;
+  }
+}
+
 // ExA1 - SKNP Vx
 // Skip next instruction if key with the value of Vx is not pressed.
 // Checks the keyboard, and if the key corresponding to the value of
@@ -343,6 +400,28 @@ void ld_vx_dt(uint8_t x) {
   logger("LD V%X, DT\n", x);
   registers[x] = delay_timer;
   PC += 2;
+}
+
+// Fx0A - LD Vx, K
+// Wait for a key press, store the value of the key in Vx.
+// All execution stops until a key is pressed, then the value of
+// that key is stored in Vx.
+void ld_vx_k(uint8_t x) {
+  logger("LD V%X, K\n");
+
+  // Spin over the keys, check if there's one that has been pressed
+  // If so, increment the program counter and move on
+
+  // waiting_for_key = registers[x];
+  // PC += 2;
+  for (int i = 0; i < 16; i++) {
+    if (key[i] == 1) {
+      registers[x] = key[i];
+      PC += 2;
+      break;
+    }
+  }
+
 }
 
 // Fx15 - LD DT, Vx
@@ -384,6 +463,14 @@ void ld_f_vx(uint8_t x) {
   PC += 2;
 }
 
+// Super 8 chip instruction
+// LD HF, Vx
+void ld_hf_vx(uint8_t x) {
+  logger("LD HF, V%X - 0x%X\n", x, registers[x]);
+  I = registers[x] * 10;
+  PC += 2;
+}
+
 // Fx33 - LD B, Vx
 // Store BCD representation of Vx in memory locations I, I+1, and I+2.
 // The interpreter takes the decimal value of Vx, and places the hundreds
@@ -399,6 +486,20 @@ void ld_b_vx(uint8_t x) {
   memory[I] = current_val / 100;
   memory[I + 1] = current_val / 10 % 10;
   memory[I + 2] = current_val % 10;
+
+  PC += 2;
+}
+
+// Fx55 - LD [I], Vx
+// Store registers V0 through Vx in memory starting at location I.
+// The interpreter copies the values of registers V0 through Vx into memory,
+// starting at the address in I.
+void ld_i_vx(uint8_t x) {
+  logger("LD [I], V%X\n", x);
+
+  for (int i = 0; i <= x; i++) {
+    memory[I + i] = registers[i];
+  }
 
   PC += 2;
 }
@@ -522,6 +623,10 @@ void emulate_cycle() {
           and_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
           break;
 
+        case 0x3: // XOR Vx, Vy
+          xor_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
         case 0x4: // ADD Vx, Vy
           add_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
           break;
@@ -530,11 +635,19 @@ void emulate_cycle() {
           sub_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
           break;
 
+        case 0x6: // SHR Vx {, Vy}
+          shr_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
         default:
           logger("Unknown opcode: in 0x8: 0x%X\n", opcode);
           break;
 
       }
+      break;
+
+    case 0x9000: // SNE Vx, Vy
+      sne_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
       break;
 
     case 0xA000: // LD I, addr
@@ -554,11 +667,23 @@ void emulate_cycle() {
       break;
 
     case 0xE000: // SKNP Vx
-      sknp_vx((opcode & 0xf00) >> 8);
+      switch(opcode & 0x00ff) {
+        case 0x9E: //  SKP Vx
+          skp_vx((opcode & 0xf00) >> 8);
+          break;
+
+        case 0xA1: // SKNP Vx
+          sknp_vx((opcode & 0xf00) >> 8);
+          break;
+      }
       break;
 
     case 0xF000:
       switch(opcode & 0x00ff) {
+        case 0x0A: // LD Vx, K
+          ld_vx_k((opcode & 0x0f00) >> 8);
+          break;
+
         case 0x07:
           ld_vx_dt((opcode & 0x0f00) >> 8);
           break;
@@ -579,8 +704,16 @@ void emulate_cycle() {
           ld_f_vx((opcode & 0x0f00) >> 8);
           break;
 
+        case 0x30: // LD HF, Vx - Super-8 chip instruction
+          ld_hf_vx((opcode & 0x0f00) >> 8);
+          break;
+
         case 0x33:
           ld_b_vx((opcode & 0x0f00) >> 8);
+          break;
+
+        case 0x55: // LD [I], Vx
+          ld_i_vx((opcode & 0x0f00) >> 8);
           break;
 
         case 0x65:
