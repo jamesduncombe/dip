@@ -13,6 +13,9 @@
 
 int scale = 10;
 
+SDL_AudioSpec have;
+SDL_AudioDeviceID dev;
+
 // Handles the updating of the screen output
 void update_screen(SDL_Renderer* renderer) {
   // Clear the back buffer
@@ -74,6 +77,42 @@ int print_usage() {
   exit(EXIT_SUCCESS);
 }
 
+void init_audio() {
+
+  SDL_AudioSpec want = {
+    .freq = 12000,
+    .format = AUDIO_F32LSB,
+    .channels = 1,
+    .samples = 64
+  };
+
+  dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
+  SDL_PauseAudioDevice(dev, 0);
+}
+
+// Create a tone and queue it up for playing
+void update_sound(SDL_AudioDeviceID* dev, SDL_AudioSpec* have, uint8_t* sound_timer) {
+  uint8_t sample[4];
+
+  if (*sound_timer > 0) {
+    uint8_t src[] = { 0x00, 0x00, 0x80, 0x3f };
+    memcpy(sample, src, 4);
+  }
+
+  int n = have->channels * have->samples * 4;
+  uint8_t *data = malloc(n);
+
+  for (int i = 0; i < n; i += 4) {
+    for (int j = 0; j < 4; j++) {
+      data[i+j] = sample[j];
+    }
+  }
+
+  SDL_QueueAudio(*dev, data, n);
+
+  free(data);
+}
+
 int main(int argc, char **argv) {
 
   char rom_path[256];
@@ -106,13 +145,15 @@ int main(int argc, char **argv) {
 
   // Useful for simple alert dialog: https://wiki.libsdl.org/SDL_ShowSimpleMessageBox
 
-  // Just Video for now, controls, sound later...
-  SDL_Init(SDL_INIT_VIDEO);
+  // Init SDL with Video and Audio enabled
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
   // Create the window and renderer
   SDL_CreateWindowAndRenderer(640, 320, 0, &window, &renderer);
 
   SDL_SetWindowTitle(window, "Dip 🕹");
+
+  init_audio();
 
   // Initialize the CPU / Memory etc
   initialize(buffer, bufferSize);
@@ -141,6 +182,8 @@ int main(int argc, char **argv) {
     if (current_time > start_time + 15) {
       // Should be 60Hz
       update_timers();
+
+      update_sound(&dev, &have, &sound_timer);
       start_time = SDL_GetTicks();
     }
 
