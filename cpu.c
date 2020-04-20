@@ -169,6 +169,20 @@ void sne_vx_yy(uint8_t x, uint8_t yy) {
   }
 }
 
+// 5xy0 - SE Vx, Vy
+// Skip next instruction if Vx = Vy.
+// The interpreter compares register Vx to register Vy, and if they are equal,
+// increments the program counter by 2.
+void se_vx_vy(uint8_t x, uint8_t y) {
+  logger("SE V%X, V%X\n", x, y);
+
+  if (registers[x] == registers[y]) {
+    PC += 4;
+  } else {
+    PC += 2;
+  }
+}
+
 // 6xkk - LD Vx, byte
 // LD Vx, byte
 void ld_vx_yy(uint8_t vx, uint8_t yy) {
@@ -196,6 +210,19 @@ void ld_vx_vy(uint8_t x, uint8_t y) {
   logger("LD V%X, V%X\n", x, y);
 
   registers[x] = registers[y];
+
+  PC += 2;
+}
+
+// 8xy1 - OR Vx, Vy
+// Set Vx = Vx OR Vy.
+// Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx.
+// A bitwise OR compares the corrseponding bits from two values, and if either bit
+// is 1, then the same bit in the result is also 1. Otherwise, it is 0.
+void or_vx_vy(uint8_t x, uint8_t y) {
+  logger("OR V%X, V%X\n", x, y);
+
+  registers[x] |= registers[y];
 
   PC += 2;
 }
@@ -277,6 +304,42 @@ void shr_vx_vy(uint8_t x, uint8_t y) {
   }
 
   registers[x] /= 2;
+
+  PC += 2;
+}
+
+// 8xy7 - SUBN Vx, Vy
+// Set Vx = Vy - Vx, set VF = NOT borrow.
+// If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy,
+// and the results stored in Vx.
+void subn_vx_vy(uint8_t x, uint8_t y) {
+  logger("SUBN V%X, V%X\n", x, y);
+
+  if (registers[y] > registers[x]) {
+    registers[VF] = 1;
+  } else {
+    registers[VF] = 0;
+  }
+
+  registers[x] -= registers[y];
+
+  PC += 2;
+}
+
+// 8xyE - SHL Vx {, Vy}
+// Set Vx = Vx SHL 1.
+// If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
+// Then Vx is multiplied by 2.
+void shl_vx_vy(uint8_t x, uint8_t y) {
+  logger("SHL V%X {, V%X}\n", x, y);
+
+  if ((0b10000000 & registers[x]) == 1) {
+    registers[VF] = 1;
+  } else {
+    registers[VF] = 0;
+  }
+
+  registers[x] *= 2;
 
   PC += 2;
 }
@@ -408,13 +471,11 @@ void ld_vx_dt(uint8_t x) {
 // All execution stops until a key is pressed, then the value of
 // that key is stored in Vx.
 void ld_vx_k(uint8_t x) {
-  logger("LD V%X, K\n");
+  logger("LD V%X, K\n", x);
 
   // Spin over the keys, check if there's one that has been pressed
   // If so, increment the program counter and move on
 
-  // waiting_for_key = registers[x];
-  // PC += 2;
   for (int i = 0; i < 16; i++) {
     if (key[i] == 1) {
       registers[x] = key[i];
@@ -607,6 +668,10 @@ void emulate_cycle() {
       sne_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
       break;
 
+    case 0x5000: // SE Vx, Vy
+      se_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+      break;
+
     case 0x6000: // LD Vx, byte
       ld_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
       break;
@@ -619,6 +684,10 @@ void emulate_cycle() {
       switch(opcode & 0xf) {
         case 0x0: // LD Vx, Vy
           ld_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        case 0x1: // OR Vx, Vy
+          or_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
           break;
 
         case 0x2: // AND Vx, Vy
@@ -641,6 +710,14 @@ void emulate_cycle() {
           shr_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
           break;
 
+        case 0x7: // SUBN Vx, Vy
+          subn_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
+        case 0xE: // SHL Vx {, Vy}
+          shl_vx_vy((opcode & 0x0f00) >> 8, (opcode & 0x00f0) >> 4);
+          break;
+
         default:
           logger("Unknown opcode: in 0x8: 0x%X\n", opcode);
           exit(EXIT_FAILURE);
@@ -657,19 +734,19 @@ void emulate_cycle() {
       ld_i_nnn(opcode & 0x0fff);
       break;
 
-    // case 0xB000: // JP V0, addr
-    //   break;
+    case 0xB000: // JP V0, addr
+      jp_v0_nnn(opcode & 0x0fff);
+      break;
 
     case 0xC000: // RND Vx, byte
       rnd_vx_yy((opcode & 0x0f00) >> 8, opcode & 0x00ff);
       break;
 
     case 0xD000: // DRW Vx, Vy, nibble
-      // Example: 0xDAB6
       drw_vx_vy((opcode & 0xf00) >> 8, (opcode & 0x00f0) >> 4, opcode & 0x000f);
       break;
 
-    case 0xE000: // SKNP Vx
+    case 0xE000:
       switch(opcode & 0x00ff) {
         case 0x9E: //  SKP Vx
           skp_vx((opcode & 0xf00) >> 8);
@@ -683,15 +760,15 @@ void emulate_cycle() {
 
     case 0xF000:
       switch(opcode & 0x00ff) {
+        case 0x07: // LD Vx, DT
+          ld_vx_dt((opcode & 0x0f00) >> 8);
+          break;
+
         case 0x0A: // LD Vx, K
           ld_vx_k((opcode & 0x0f00) >> 8);
           break;
 
-        case 0x07:
-          ld_vx_dt((opcode & 0x0f00) >> 8);
-          break;
-
-        case 0x15:
+        case 0x15: // LD DT, Vx
           ld_dt_vx((opcode & 0x0f00) >> 8);
           break;
 
@@ -703,7 +780,7 @@ void emulate_cycle() {
           add_i_vx((opcode & 0x0f00) >> 8);
           break;
 
-        case 0x29:
+        case 0x29: // LD F, Vx
           ld_f_vx((opcode & 0x0f00) >> 8);
           break;
 
@@ -711,7 +788,7 @@ void emulate_cycle() {
           ld_hf_vx((opcode & 0x0f00) >> 8);
           break;
 
-        case 0x33:
+        case 0x33: // LD B, Vx
           ld_b_vx((opcode & 0x0f00) >> 8);
           break;
 
@@ -719,7 +796,7 @@ void emulate_cycle() {
           ld_i_vx((opcode & 0x0f00) >> 8);
           break;
 
-        case 0x65:
+        case 0x65: // LD Vx, [I]
           ld_vx_i((opcode & 0x0f00) >> 8);
           break;
 
