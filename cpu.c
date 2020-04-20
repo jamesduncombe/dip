@@ -103,6 +103,7 @@ void sys(uint16_t nnn) {
 void cls() {
   logger("CLS\n");
   memset(gfx, 0, 64 * 32);
+  drawFlag = 1;
   PC += 2;
 }
 
@@ -334,7 +335,7 @@ void rnd_vx_yy(uint8_t x, uint8_t yy) {
 // on XOR, and section 2.4, Display, for more information on the Chip-8 screen
 // and sprites.
 void drw_vx_vy(uint8_t x, uint8_t y, uint8_t n) {
-  logger("DRW V%X, V%X, %X\n", x, y, n);
+  logger("DRW V%X, V%X, 0x%X\n", x, y, n);
 
   uint8_t x_val = get_vreg(x);
   uint8_t y_val = get_vreg(y);
@@ -384,9 +385,9 @@ void skp_vx(uint8_t x) {
 // Checks the keyboard, and if the key corresponding to the value of
 // Vx is currently in the up position, PC is increased by 2.
 void sknp_vx(uint8_t x) {
-  logger("SKNP V%X\n", x);
+  logger("SKNP V%X val: %d\n", x, registers[x]);
 
-  if ((key[x] & 1) != 1) {
+  if (key[registers[x]] != 1) {
     PC += 4;
   } else {
     PC += 2;
@@ -585,6 +586,7 @@ void emulate_cycle() {
 
         default:
           logger("Unknown opcode: in 0x0: 0x%X\n", opcode);
+          exit(EXIT_FAILURE);
           break;
       }
       break;
@@ -641,6 +643,7 @@ void emulate_cycle() {
 
         default:
           logger("Unknown opcode: in 0x8: 0x%X\n", opcode);
+          exit(EXIT_FAILURE);
           break;
 
       }
@@ -722,12 +725,14 @@ void emulate_cycle() {
 
         default:
           logger("Unknown opcode: 0x%X\n", opcode);
+          exit(EXIT_FAILURE);
           break;
       }
       break;
 
     default:
       logger("Unknown opcode: 0x%X\n", opcode);
+      exit(EXIT_FAILURE);
       break;
   }
 
