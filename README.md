@@ -2,7 +2,13 @@
 
 Emulator / interpreter for the CHIP-8 VM.
 
+On MacOS...
+
 ![Space Invaders on CHIP8](./invaders.png)
+
+On an [ESP32](https://heltec.org/project/wifi-kit-32/) after some porting...
+
+![Space Invaders on Heltec ESP32 Wifi Kit 32](./esp32-space-invaders.jpg)
 
 ## Building
 
